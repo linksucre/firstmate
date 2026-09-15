@@ -123,6 +123,14 @@ test_lock_identity_and_liveness_classification() {
   [ "$(fm_backend_tmux_classify_process_name /opt/omp/bin/omp)" = agent ] || fail "tmux liveness must classify an omp path as an agent"
   [ "$(fm_backend_tmux_classify_process_name ompd)" != agent ] || fail "tmux liveness must not classify ompd as an agent"
   [ "$(fm_backend_tmux_classify_process_name comp)" != agent ] || fail "tmux liveness must not classify comp as an agent"
+  # A glob metacharacter in the args must never expand against the lock
+  # script's cwd and conjure a harness token from an unrelated file.
+  mkdir -p "$TMP_ROOT/glob-cwd"
+  : > "$TMP_ROOT/glob-cwd/omp"
+  ( cd "$TMP_ROOT/glob-cwd" \
+    && ! fm_harness_process_matches /usr/bin/node 'node --include *' ) \
+    || fail "session-lock identity must not glob args against the cwd"
+  pass "session lock and tmux liveness: omp is anchored, decoys stay out"
 }
 
 # omp 18.1.15 installs as a bun script: the live process is `bun .../bin/omp`
@@ -635,6 +643,7 @@ EOF
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_detection_bun_interpreter_form
+test_spawn_launch_line_and_worker_wiring
 test_spawn_model_validation_scoped_to_listed_providers
 test_secondmate_launch_relies_on_discovery
 test_secondmate_config_pinned_model_is_validated

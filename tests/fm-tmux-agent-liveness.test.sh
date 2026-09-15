@@ -194,6 +194,35 @@ for decoy in ompd comp; do
 done
 pass "tmux liveness: unrelated omp-containing command names stay ambiguous"
 
+# --- omp 18.1.15's bun interpreter form -------------------------------------
+# omp now installs as a bun script, so the pane's foreground process is
+# `bun .../bin/omp` with comm=bun and argv0=bun. Neither name source can
+# attribute it; only the flattened foreground args carry the anchored omp
+# script-path word. The decoys prove that evidence stays anchored.
+
+ln -s /bin/bash "$LAB/bin/bun"
+mkdir -p "$LAB/omp-run"
+for name in omp ompd comp; do
+  cat > "$LAB/omp-run/$name" <<SH
+#!/usr/bin/env bash
+"$SLEEP_BIN" 900 &
+wait
+SH
+  chmod +x "$LAB/omp-run/$name"
+done
+
+new_window bun-omp "$LAB/bin/bun" "$LAB/omp-run/omp"
+wait_for_state "$SESSION:bun-omp" alive \
+  || fail "a bun process running the omp script must classify alive"
+pass "tmux liveness: a bun-run omp classifies alive from its anchored script path"
+
+for decoy in ompd comp; do
+  new_window "bun-decoy-$decoy" "$LAB/bin/bun" "$LAB/omp-run/$decoy"
+  wait_for_state "$SESSION:bun-decoy-$decoy" ambiguous \
+    || fail "a bun process running '$decoy' must not classify as a live agent pane"
+done
+pass "tmux liveness: bun-run omp near-name decoys stay ambiguous"
+
 # --- a version name blinds one source ---------------------------------------
 # Giving a genuine harness-named executable the version-string argv[0] that
 # Claude Code 2.1.220 reports drives the two sources apart on both supported
