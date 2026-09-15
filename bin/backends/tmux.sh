@@ -174,7 +174,9 @@ fm_backend_tmux_classify_process_name() {  # <path> [argv0] -> agent|shell|other
     muse|muse-bin-*) printf 'agent' ;;
     # omp (Oh My Pi) is anchored for the same reason as muse: its live process
     # name is the bare word `omp` (verified, omp 18.1.11) and a glob would claim
-    # unrelated commands such as ompd or comp.
+    # unrelated commands such as ompd or comp. From 18.1.15 it also runs as a
+    # bun script (`bun .../bin/omp`, comm=bun), which carries no omp name here;
+    # fm_backend_tmux_agent_state attributes that form from its foreground args.
     *claude*|*codex*|*opencode*|*grok*|*kimi*|*rovo*|pi|pi-signed|pi-launcher|Pi|omp) printf 'agent' ;;
     zsh|bash|sh|dash|ash|ksh|mksh|tcsh|csh|fish) printf 'shell' ;;
     *)
@@ -297,7 +299,7 @@ fm_backend_tmux_foreground_argv0s() {  # <target>
 # distinguish a truly idle pane from a rewritten process title.
 fm_backend_tmux_agent_state() {  # <target>
   local target=$1 comm session window windows inventory_status
-  local foreground argv0s name pid fg_seen=0 fg_shell=0 fg_other=0
+  local foreground argv0s name pid fg_seen=0 fg_shell=0 fg_other=0 fg_args
   case "$target" in
     *:*:*|'':*|*:'') printf 'unreadable'; return 0 ;;
     *:*) ;;
@@ -365,12 +367,27 @@ EOF
 
   # Fall back to flattened arguments on platforms without /proc. Positive
   # evidence only - a bare interpreter still reaches the negative verdicts.
+  # omp 18.1.15 runs as `bun .../bin/omp` (comm=bun, argv0=bun), which no name
+  # source above can attribute, so its anchored script-path word is read from
+  # the interpreter's args. Only that narrow form is accepted, the same family
+  # bin/fm-harness.sh owns: the shared harness matcher would also claim an
+  # unrelated interpreter from a harness-named path component or a claude
+  # substring, and a false `alive` skips recovery of a genuinely dead worker.
   while IFS= read -r name; do
     [ -n "$name" ] || continue
+    fg_args=${name#"${name%%[![:space:]]*}"}
     if fm_gemini_args_are_gemini "$name"; then
       printf 'alive'
       return 0
     fi
+    case "${fg_args%%[[:space:]]*}" in
+      */omp|omp) printf 'alive'; return 0 ;;
+      *bun*)
+        case "$name" in
+          *" omp "*|*/omp\ *|*/omp) printf 'alive'; return 0 ;;
+        esac
+        ;;
+    esac
   done <<EOF
 $(fm_backend_tmux_foreground_args "$target")
 EOF

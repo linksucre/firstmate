@@ -18,7 +18,10 @@
 
 # Known harness command names; extend when a new adapter is verified. omp is
 # anchored exactly like pi: its process name is the bare word `omp` (verified,
-# omp 18.1.11), and a substring match would claim ompd or comp.
+# omp 18.1.11), and from 18.1.15 it also runs as a bun script (`bun .../bin/omp`,
+# comm=bun), so the interpreter branch below matches it from an anchored
+# script-path component. A substring match would claim ompd or comp in either
+# form.
 FM_HARNESS_RE='claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
 
 # The same harnesses as exact executable names. Keep in sync with
@@ -61,7 +64,8 @@ fm_harness_path_name() {  # <path>
 #   4. Cursor's own structural identity, owned by bin/fm-cursor-lib.sh.
 FM_HARNESS_IS_CLAUDE=0
 fm_harness_process_matches() {  # <comm> <args>
-  local comm=$1 args=$2 base argv0 name
+  local comm=$1 args=$2 base argv0 name token
+  local -a tokens
   FM_HARNESS_IS_CLAUDE=0
   base=$(basename -- "$comm")
   if printf '%s' "$base" | grep -qE "$FM_HARNESS_RE"; then
@@ -74,8 +78,23 @@ fm_harness_process_matches() {  # <comm> <args>
     return 0
   fi
   # Bare interpreter (e.g. node): match the harness name in its script path.
+  # omp 18.1.15 installs as a bun script (#!/usr/bin/env bun, ~/.bun/bin/omp ->
+  # @oh-my-pi/pi-coding-agent/dist/cli.js), so the live harness process is
+  # `bun .../bin/omp` (verified 2026-09-15) and the anchored names never match
+  # the loose grep above: also test every argument token as a path component.
+  # That anchored check runs before the loose grep so a bun-run omp keeps the
+  # precedence the native arm above holds when its args carry a claude name.
+  # `read -a` splits without pathname expansion, so a glob in a prompt cannot
+  # turn unrelated filesystem entries into harness tokens.
   case "$comm" in
-    *node*|*python*)
+    *node*|*python*|*bun*)
+      read -r -a tokens <<< "$args"
+      for token in ${tokens[@]+"${tokens[@]}"}; do
+        if name=$(fm_harness_path_name "$token"); then
+          case "$name" in claude) FM_HARNESS_IS_CLAUDE=1 ;; esac
+          return 0
+        fi
+      done
       if printf '%s' "$args" | grep -qE "$FM_HARNESS_RE"; then
         case "$args" in *claude*) FM_HARNESS_IS_CLAUDE=1 ;; esac
         return 0
