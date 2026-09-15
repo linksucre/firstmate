@@ -71,6 +71,7 @@ test_detection_anchored_name_and_marker_precedence() {
     "$bin/omp" -c '"$1"; :' _ "$HARNESS")
   [ "$out" = omp ] || fail "a process named omp must detect as omp, got '$out'"
   for decoy in ompd comp; do
+    # shellcheck disable=SC2016 # the quoted body expands inside the named shell
     out=$(detect_detached -- "$bin/$decoy" -c '"$1"; :' _ "$HARNESS")
     [ "$out" != omp ] || fail "'$decoy' merely contains omp and must not detect as omp, got '$out'"
   done
@@ -80,6 +81,7 @@ test_detection_anchored_name_and_marker_precedence() {
     "$bin/omp" -c '"$1"; :' _ "$HARNESS")
   [ "$out" = omp ] || fail "FM_OMP_HARNESS under an omp ancestor must outrank an inherited CLAUDECODE, got '$out'"
   # ...and is inert when it leaks into a worker with no omp ancestor.
+  # shellcheck disable=SC2016 # the quoted body expands inside the named shell
   out=$(detect_detached CLAUDECODE=1 FM_OMP_HARNESS=omp -- bash -c '"$1"; :' _ "$HARNESS")
   [ "$out" = claude ] || fail "a leaked FM_OMP_HARNESS without an omp ancestor must not relabel a claude worker, got '$out'"
   pass "fm-harness: omp detects by its anchored name; the marker is a precedence override that needs real omp ancestry"
@@ -100,7 +102,7 @@ detect_detached() {  # [NAME=VALUE...] -- <command...>
   done
   shift
   : > "$out"
-  # shellcheck disable=SC2086 # word splitting of NAME=VALUE pairs is intended
+  # shellcheck disable=SC2016,SC2086 # quoted body expands in the named shell; NAME=VALUE splitting is intended
   env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
     DETACH_OUT=$out $assigns bash -c '(sleep 0.2; "$@" > "$DETACH_OUT") &' _ "$@"
   while [ "$i" -lt 200 ] && [ ! -s "$out" ]; do
@@ -168,6 +170,7 @@ test_detection_bun_interpreter_form() {
   out=$(detect_detached -- "$bin/bun" "$scripts/bin/omp" "$HARNESS" "$TMP_ROOT/claude-args-note")
   [ "$out" = omp ] || fail "a bun-run omp with a claude-named argument must stay omp, got '$out'"
   # The session-lock ancestry walk resolves the same bun-run omp ancestor.
+  # shellcheck disable=SC2016 # the quoted body expands inside the named shell
   out=$(detect_detached -- "$bin/bun" "$scripts/bin/omp" \
     bash -c '. "$1"; fm_harness_ancestry_pid' _ "$ROOT/bin/fm-session-lock-lib.sh")
   [ -n "$out" ] || fail "the session-lock ancestry found no harness under a bun-run omp ancestor"
