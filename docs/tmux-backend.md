@@ -60,7 +60,7 @@ Scoping the second source to the foreground process group rather than to the pan
 The same scoping covers multi-process launchers without a special case, so the Pi Launcher path is attributed through its `pi-signed` wrapper and `pi` engine even though its title is the exact foreground command `pi-launcher`.
 Direct executable identities `pi`, `pi-signed`, and `Pi` remain accepted exactly, and similar or prefixed process names are not accepted through those exact Pi-family entries.
 Muse is likewise anchored to the exact `muse` launcher identity or the installed `muse-bin-<version>` prefix, so unrelated names such as `musescore` and `amuse` remain ambiguous.
-omp is anchored to the exact `omp` identity for the same reason, so `ompd` and `comp` remain ambiguous.
+omp is anchored to the exact `omp` identity for the same reason, so `ompd` and `comp` remain ambiguous; from omp 18.1.15 the pane's foreground process is `bun .../bin/omp` (`comm=bun`), and the probe attributes its `alive` verdict only from the anchored `omp` script-path word in the foreground args, never from the bare interpreter or a harness-named path component.
 Cursor is identified from its exact `cursor-agent` identity or versioned install tree in the foreground process path or structured argv[0]; a bare `node` or unrelated `agent` remains ambiguous.
 
 The CI-enforced portable regression and opt-in real-harness drift guard follow the split owned by `.agents/skills/firstmate-coding-guidelines/SKILL.md`.
