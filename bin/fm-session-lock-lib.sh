@@ -89,7 +89,7 @@ fm_harness_process_matches() {  # <comm> <args>
   case "$comm" in
     *node*|*python*|*bun*)
       read -r -a tokens <<< "$args"
-      for token in "${tokens[@]}"; do
+      for token in ${tokens[@]+"${tokens[@]}"}; do
         if name=$(fm_harness_path_name "$token"); then
           case "$name" in claude) FM_HARNESS_IS_CLAUDE=1 ;; esac
           return 0

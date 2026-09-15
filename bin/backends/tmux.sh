@@ -367,17 +367,27 @@ EOF
 
   # Fall back to flattened arguments on platforms without /proc. Positive
   # evidence only - a bare interpreter still reaches the negative verdicts.
-  # The shared harness identity rule is consulted too: omp 18.1.15 runs as
-  # `bun .../bin/omp` (comm=bun, argv0=bun), which no name source above can
-  # attribute, and the rule already owns the *bun* + anchored-omp case.
+  # omp 18.1.15 runs as `bun .../bin/omp` (comm=bun, argv0=bun), which no name
+  # source above can attribute, so its anchored script-path word is read from
+  # the interpreter's args. Only that narrow form is accepted, the same family
+  # bin/fm-harness.sh owns: the shared harness matcher would also claim an
+  # unrelated interpreter from a harness-named path component or a claude
+  # substring, and a false `alive` skips recovery of a genuinely dead worker.
   while IFS= read -r name; do
     [ -n "$name" ] || continue
     fg_args=${name#"${name%%[![:space:]]*}"}
-    if fm_gemini_args_are_gemini "$name" \
-      || fm_harness_process_matches "${fg_args%%[[:space:]]*}" "$name"; then
+    if fm_gemini_args_are_gemini "$name"; then
       printf 'alive'
       return 0
     fi
+    case "${fg_args%%[[:space:]]*}" in
+      */omp|omp) printf 'alive'; return 0 ;;
+      *bun*)
+        case "$name" in
+          *" omp "*|*/omp\ *|*/omp) printf 'alive'; return 0 ;;
+        esac
+        ;;
+    esac
   done <<EOF
 $(fm_backend_tmux_foreground_args "$target")
 EOF

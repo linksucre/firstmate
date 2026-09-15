@@ -123,6 +123,10 @@ test_lock_identity_and_liveness_classification() {
   [ "$(fm_backend_tmux_classify_process_name /opt/omp/bin/omp)" = agent ] || fail "tmux liveness must classify an omp path as an agent"
   [ "$(fm_backend_tmux_classify_process_name ompd)" != agent ] || fail "tmux liveness must not classify ompd as an agent"
   [ "$(fm_backend_tmux_classify_process_name comp)" != agent ] || fail "tmux liveness must not classify comp as an agent"
+  # An interpreter that exits between the comm and args reads yields an empty
+  # args string; the token split must not abort under set -u on stock bash 3.2.
+  ! fm_harness_process_matches /usr/bin/bun '' \
+    || fail "session-lock identity must not match a bun process with no args"
   # A glob metacharacter in the args must never expand against the lock
   # script's cwd and conjure a harness token from an unrelated file.
   mkdir -p "$TMP_ROOT/glob-cwd"

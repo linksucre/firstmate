@@ -223,6 +223,22 @@ for decoy in ompd comp; do
 done
 pass "tmux liveness: bun-run omp near-name decoys stay ambiguous"
 
+# The narrowed evidence must not widen into an unrelated interpreter: a bun
+# pane whose args merely carry a harness-named path component is not an omp
+# agent, and a false `alive` here would skip recovery of a genuinely dead
+# worker.
+mkdir -p "$LAB/pi"
+cat > "$LAB/pi/server.js" <<SH
+#!/usr/bin/env bash
+"$SLEEP_BIN" 900 &
+wait
+SH
+chmod +x "$LAB/pi/server.js"
+new_window bun-harness-path "$LAB/bin/bun" "$LAB/pi/server.js"
+wait_for_state "$SESSION:bun-harness-path" ambiguous \
+  || fail "a bun process running a harness-named path that is not omp must not classify as a live agent pane"
+pass "tmux liveness: a bun-run non-omp script with harness-named args stays ambiguous"
+
 # --- a version name blinds one source ---------------------------------------
 # Giving a genuine harness-named executable the version-string argv[0] that
 # Claude Code 2.1.220 reports drives the two sources apart on both supported
