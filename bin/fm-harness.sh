@@ -158,22 +158,29 @@ detect_own() {
       muse|muse-bin-*) echo muse; return ;;
       pi-signed) echo pi; return ;;
       pi) echo pi; return ;;
-      # omp is a Bun-compiled single binary whose process name is exactly `omp`
-      # (verified, omp 18.1.11: `ps -o comm=` reports omp from both its `!`
+      # omp 18.1.11 was a Bun-compiled single binary whose process name is
+      # exactly `omp` (verified: `ps -o comm=` reports omp from both its `!`
       # bash path and the model's bash tool). Anchored, never *omp*, so ompd,
       # comp, and similar unrelated commands are not misread as this harness.
-      # It sits above the node*|python* interpreter fallback deliberately: the
-      # optional claude-bridge extension runs a nested executable literally
-      # named `claude` with its own node child, and that fallback's *claude*
-      # args glob would otherwise claim it if that subtree were ever walked.
+      # omp 18.1.15 instead installs as a bun script and runs as
+      # `bun .../bin/omp` (verified 2026-09-15), which only the interpreter
+      # fallback below reaches. It sits above the loose args globs
+      # deliberately: the optional claude-bridge extension runs a nested
+      # executable literally named `claude` with its own node child, and those
+      # globs would otherwise claim it if that subtree were ever walked.
       omp) echo omp; return ;;
-      node*|python*)
+      node*|python*|*bun*)
         # Bare interpreter: match the harness name in its script path.
         args=$(ps -o args= -p "$pid" 2>/dev/null)
         if fm_gemini_args_are_gemini "$args"; then
           echo gemini
           return
         fi
+        # Anchored script-path word, checked before the loose globs below so
+        # a bun-run omp keeps the precedence the native arm above holds.
+        case "$args" in
+          *" omp "*|*/omp\ *|*/omp) echo omp; return ;;
+        esac
         case "$args" in
           *claude*) echo claude; return ;;
           *codex*) echo codex; return ;;
@@ -191,13 +198,20 @@ detect_own() {
 }
 
 # True when an exact `omp` process sits within eight parents of this one. The
-# same anchored match as the ancestry walk in detect_own, kept separate so the
-# marker precedence above can demand real process evidence.
+# same anchored matches as the ancestry walk in detect_own, kept separate so
+# the marker precedence above can demand real process evidence.
 ancestry_names_omp() {
-  local pid=$$ comm
+  local pid=$$ comm args
   for _ in 1 2 3 4 5 6 7 8; do
     comm=$(ps -o comm= -p "$pid" 2>/dev/null) || return 1
     [ "$(basename -- "$comm")" = omp ] && return 0
+    case "$comm" in
+      *bun*)
+        args=$(ps -o args= -p "$pid" 2>/dev/null)
+        case "$args" in
+          *" omp "*|*/omp\ *|*/omp) return 0 ;;
+        esac ;;
+    esac
     pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
     [ -n "$pid" ] && [ "$pid" -gt 1 ] || return 1
   done

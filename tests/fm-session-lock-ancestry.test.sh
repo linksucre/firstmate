@@ -134,6 +134,60 @@ SH
   pass "session-lock: ordinary script paths under a harness directory are not harness processes"
 }
 
+# omp 18.1.15 runs as `bun .../bin/omp` (comm=bun), so the interpreter branch
+# must recognize the harness from an anchored path component in the args while
+# near-name decoys stay out.
+test_bun_interpreter_omp_is_identified_and_decoys_are_not() {
+  local dir fakebin shape
+  dir="$TMP_ROOT/bun-omp"
+  fakebin=$(fm_fakebin "$dir")
+  mkdir -p "$dir/state"
+  cat > "$fakebin/ps" <<'SH'
+#!/usr/bin/env bash
+set -u
+field= pid=
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -o) field=$2; shift 2 ;;
+    -p) pid=$2; shift 2 ;;
+    *) shift ;;
+  esac
+done
+case "$pid:$field:${FM_TEST_BUN_SHAPE:-omp}" in
+  900:comm=:omp) printf '%s\n' 'bun' ;;
+  900:args=:omp) printf '%s\n' '/Users/u/.bun/bin/bun /Users/u/.bun/bin/omp --serve' ;;
+  900:comm=:ompd) printf '%s\n' 'bun' ;;
+  900:args=:ompd) printf '%s\n' 'bun /repo/bin/ompd --serve' ;;
+  900:comm=:comp) printf '%s\n' 'bun' ;;
+  900:args=:comp) printf '%s\n' 'bun run comp --watch' ;;
+  900:ppid=:*) printf '%s\n' 1 ;;
+  *:comm=:*) printf '%s\n' bash ;;
+  *:args=:*) printf '%s\n' 'bash /repo/bin/fm-lock.sh' ;;
+  *:ppid=:*) printf '%s\n' 900 ;;
+esac
+SH
+  chmod +x "$fakebin/ps"
+  printf '900\n' > "$dir/state/.lock"
+
+  FM_TEST_BUN_SHAPE=omp lib_eval "$fakebin" 'fm_harness_pid_alive 900' \
+    || fail "a bun process running the omp script was not recognized as a harness"
+  local got
+  got=$(FM_TEST_BUN_SHAPE=omp lib_eval "$fakebin" 'fm_harness_ancestry_pid') \
+    || fail "the bun-run omp session was not found in the ancestry at all"
+  [ "$got" = 900 ] || fail "ancestry resolved '$got', expected the bun-run omp pid 900"
+  FM_TEST_BUN_SHAPE=omp lib_eval "$fakebin" "fm_session_lock_owned_by_self '$dir/state'" \
+    || fail "the bun-run omp session holding the lock did not recognize itself as the owner"
+  for shape in ompd comp; do
+    if FM_TEST_BUN_SHAPE="$shape" lib_eval "$fakebin" 'fm_harness_pid_alive 900'; then
+      fail "$shape: a bun process running a near-name decoy passed the harness predicate"
+    fi
+    if FM_TEST_BUN_SHAPE="$shape" lib_eval "$fakebin" "fm_session_lock_owned_by_self '$dir/state'"; then
+      fail "$shape: a bun-run decoy claimed the home's session lock"
+    fi
+  done
+  pass "session-lock: bun-run omp is identified from its script path; ompd and comp decoys stay out"
+}
+
 test_harness_beyond_a_gap_never_owns_the_lock() {
   local dir fakebin got
   dir="$TMP_ROOT/gap"
@@ -360,6 +414,7 @@ test_e2e_daemon_parented_version_named_session_keeps_its_lock() {
 
 test_version_named_session_is_identified_on_both_platforms
 test_ordinary_paths_are_never_harness_processes
+test_bun_interpreter_omp_is_identified_and_decoys_are_not
 test_harness_beyond_a_gap_never_owns_the_lock
 test_competing_version_named_session_is_seen_as_live
 test_e2e_version_named_session_claims_the_home
