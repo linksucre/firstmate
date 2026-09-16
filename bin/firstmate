@@ -1,0 +1,5 @@
+#!/bin/sh
+# firstmate launcher — start the primary firstmate session (omp harness) from anywhere
+export FM_OMP_HARNESS=omp
+cd "$HOME/firstmate" || { echo "✗ firstmate distro not found at ~/firstmate" >&2; exit 1; }
+exec omp "$@"
