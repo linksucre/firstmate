@@ -1,0 +1,36 @@
+{
+  "rules": [
+    {
+      "when": "The task's primary deliverable is high-value ideation, narrative or video concept direction, workflow design, KPI or metric-system design, architecture choice, or a decision where the quality of the reasoning materially changes the direction of later work.",
+      "use": {
+        "harness": "codex",
+        "model": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "why": "Reserve ChatGPT Plus Codex capacity for decisions and designs whose quality affects substantial downstream work. End this stage with a concise durable brief for execution."
+    },
+    {
+      "when": "The task requires a difficult root-cause investigation, a risky or broad multi-file implementation, a major refactor, a long dependent execution chain, or GLM-5.3-Flash has twice reproduced the same failure with no meaningful reduction in uncertainty and the evidence indicates a reasoning or implementation capability limit.",
+      "use": {
+        "harness": "omp",
+        "model": "zai/glm-5.3",
+        "effort": "high"
+      },
+      "why": "Use the flagship Coding Plan model only when task complexity or observed evidence justifies its higher quota consumption."
+    },
+    {
+      "when": "The task is low-risk summarization, classification, formatting, candidate generation, file or asset inventory, simple extraction, or another mechanical transformation whose output is cheaply sampled or deterministically checked.",
+      "use": {
+        "harness": "omp",
+        "model": "zai/glm-4.7-flash",
+        "effort": "low"
+      },
+      "why": "Use the verified free text model for bounded mechanical work with inexpensive validation."
+    }
+  ],
+  "default": {
+    "harness": "omp",
+    "model": "zai/glm-5.3-flash",
+    "effort": "low"
+  }
+}
